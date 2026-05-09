@@ -1,534 +1,561 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore, collection, onSnapshot, addDoc, updateDoc, 
-  deleteDoc, doc, query 
-} from 'firebase/firestore';
-import { 
-  getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken 
-} from 'firebase/auth';
-import { 
-  Search, Plus, Trash2, Edit3, CheckCircle2, AlertCircle, 
-  Clock, Shield, BarChart3, Users, Filter, Globe, 
-  TrendingUp, Flag, MapPin, Share2, MoreVertical, 
-  Check, X, ChevronRight, LayoutDashboard, Database,
-  Fingerprint, Eye, MessageSquare, Award, Newspaper
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+<!DOCTYPE html>
+<html lang="en">
 
-// --- Firebase Configuration ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-  apiKey: "AIzaSyBmsAClSWTfopqVJd8myG7vqQDSd9Z2XkA",
-  authDomain: "mystery-fff8d.firebaseapp.com",
-  projectId: "mystery-fff8d",
-  storageBucket: "mystery-fff8d.firebasestorage.app",
-  messagingSenderId: "1082125532602",
-  appId: "1:1082125532602:web:33b205e3047200d95d3183"
-};
+<head>
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+  <meta charset="UTF-8" />
 
-// --- Constants ---
-const CATEGORIES = ["Social Viral", "Breaking News", "Paranormal", "UFO/Military", "Crime", "Tech"];
-const STATUS_OPTIONS = ["Unsolved", "Under Investigation", "Solved", "Debunked", "Archived"];
-const URGENCY_LEVELS = ["Low", "Medium", "High", "Critical"];
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
 
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [view, setView] = useState('feed'); 
-  const [mysteries, setMysteries] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterCategory, setFilterCategory] = useState('All');
-  
-  const [formData, setFormData] = useState({
-    title: '', description: '', category: 'Breaking News', 
-    location: '', urgency: 'Medium', tags: '', source: ''
-  });
+  <title>NEWS INTEL</title>
 
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (err) { console.error("Auth error", err); }
-    };
-    initAuth();
-    
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (!currentUser) setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+  <script src="https://cdn.tailwindcss.com"></script>
 
-  useEffect(() => {
-    if (!user) return;
-    const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'mysteries');
-    const q = query(collectionRef);
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      data.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      setMysteries(data);
-      setLoading(false);
-    }, (err) => {
-      console.error("Firestore error", err);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [user]);
+  <style>
 
-  const handleAddMystery = async (e) => {
-    e.preventDefault();
-    if (!formData.title || !formData.description || !user) return;
-
-    try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mysteries'), {
-        ...formData,
-        tags: formData.tags.split(',').map(t => t.trim()).filter(t => t),
-        status: 'Unsolved',
-        createdAt: Date.now(),
-        authorId: user.uid,
-        authorName: user.isAnonymous ? 'Field Reporter' : (user.displayName || 'Contributor'),
-        votes: 0,
-      });
-      setFormData({ title: '', description: '', category: 'Breaking News', location: '', urgency: 'Medium', tags: '', source: '' });
-      setView('feed');
-    } catch (err) { console.error("Error adding", err); }
-  };
-
-  const updateStatus = async (id, newStatus) => {
-    if (!user) return;
-    try {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mysteries', id), { status: newStatus });
-    } catch (err) { console.error("Update error", err); }
-  };
-
-  const deleteMystery = async (id) => {
-    if (!user) return;
-    if (window.confirm("Purge this news intelligence record?")) {
-      try {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mysteries', id));
-      } catch (err) { console.error("Delete error", err); }
+    body {
+      background: #05070a;
+      color: white;
+      overflow-x: hidden;
     }
-  };
 
-  const filtered = useMemo(() => {
-    return mysteries.filter(m => {
-      const titleMatch = m.title?.toLowerCase().includes(searchQuery.toLowerCase());
-      const descMatch = m.description?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesSearch = titleMatch || descMatch;
-      const matchesCat = filterCategory === 'All' || m.category === filterCategory;
-      return matchesSearch && matchesCat;
-    });
-  }, [mysteries, searchQuery, filterCategory]);
+    .glass {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
 
-  const stats = useMemo(() => ({
-    total: mysteries.length,
-    solved: mysteries.filter(m => m.status === 'Solved').length,
-    viral: mysteries.filter(m => m.category === 'Social Viral').length,
-    critical: mysteries.filter(m => m.urgency === 'Critical').length
-  }), [mysteries]);
+  </style>
 
-  const StatusBadge = ({ status }) => {
-    const colors = {
-      Unsolved: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-      'Under Investigation': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-      Solved: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      Debunked: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
-      Archived: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
-    };
-    return (
-      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${colors[status] || colors.Unsolved}`}>
-        {status}
-      </span>
-    );
-  };
+</head>
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#05070a] flex items-center justify-center">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-4">
-        <Fingerprint className="w-12 h-12 text-cyan-500 animate-pulse" />
-        <span className="text-cyan-900 font-mono text-xs tracking-[0.3em] uppercase">Decrypting Social Intel...</span>
-      </motion.div>
-    </div>
-  );
+<body>
 
-  return (
-    <div className="min-h-screen bg-[#05070a] text-slate-300 font-sans selection:bg-cyan-500/30 overflow-x-hidden">
-      
-      {/* Background Ambience */}
-      <div className="fixed inset-0 pointer-events-none opacity-20">
-        <div className="absolute top-[-5%] left-[-5%] w-[40%] h-[40%] bg-cyan-900/30 blur-[150px] rounded-full" />
-        <div className="absolute bottom-[-5%] right-[-5%] w-[40%] h-[40%] bg-blue-900/20 blur-[150px] rounded-full" />
+  <!-- BACKGROUND -->
+
+  <div class="fixed inset-0 opacity-20 pointer-events-none">
+
+    <div class="absolute top-0 left-0 w-96 h-96 bg-cyan-500 blur-[150px]"></div>
+
+    <div class="absolute bottom-0 right-0 w-96 h-96 bg-blue-500 blur-[150px]"></div>
+
+  </div>
+
+  <!-- HEADER -->
+
+  <header class="sticky top-0 z-50 glass">
+
+    <div class="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+
+      <div>
+
+        <h1 class="text-3xl font-black tracking-tight">
+          NEWS <span class="text-cyan-400">INTEL</span>
+        </h1>
+
+        <p class="text-xs uppercase tracking-[0.3em] text-slate-500 mt-2">
+          World Mystery Tracking Network
+        </p>
+
       </div>
 
-      {/* Modern Navigation */}
-      <nav className="sticky top-0 z-50 border-b border-white/5 bg-black/60 backdrop-blur-2xl">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('feed')}>
-              <div className="w-9 h-9 bg-gradient-to-tr from-cyan-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
-                <Newspaper className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-extrabold text-white tracking-tighter text-xl hidden sm:block">NEWS<span className="text-cyan-500">INTEL</span></span>
-            </div>
-            <div className="hidden md:flex items-center gap-8">
-              {['Feed', 'Admin'].map(item => (
-                <button 
-                  key={item} 
-                  onClick={() => item === 'Feed' ? setView('feed') : setView('admin')}
-                  className={`text-xs font-bold uppercase tracking-widest transition-colors hover:text-white ${view === item.toLowerCase() ? 'text-white border-b-2 border-cyan-500 pb-1' : 'text-slate-500'}`}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-          </div>
+      <div class="text-xs uppercase tracking-widest text-slate-500 font-bold">
+        Realtime Investigation Feed
+      </div>
 
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setView('submit')}
-              className="bg-white text-black hover:bg-slate-200 text-[11px] font-black px-5 py-2.5 rounded-full flex items-center gap-2 transition-all shadow-xl active:scale-95"
-            >
-              <Plus className="w-4 h-4" /> REPORT MYSTERY
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-4 py-10">
-        
-        {view === 'feed' && (
-          <div className="space-y-12">
-            {/* Quick Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: 'Intelligence Records', val: stats.total, icon: Database, col: 'text-cyan-400' },
-                { label: 'Solved Investigations', val: stats.solved, icon: CheckCircle2, col: 'text-emerald-400' },
-                { label: 'Viral Mysteries', val: stats.viral, icon: TrendingUp, col: 'text-purple-400' },
-                { label: 'Critical Level', val: stats.critical, icon: AlertCircle, col: 'text-rose-400' }
-              ].map((s, idx) => (
-                <div key={idx} className="bg-white/[0.03] border border-white/10 p-5 rounded-3xl backdrop-blur-md">
-                  <s.icon className={`w-5 h-5 ${s.col} mb-3`} />
-                  <div className="text-3xl font-black text-white">{s.val}</div>
-                  <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">{s.label}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Investigative Search & Filtering */}
-            <section className="flex flex-col md:flex-row gap-5 items-center justify-between bg-white/[0.02] border border-white/5 p-3 rounded-3xl backdrop-blur-md">
-              <div className="relative w-full md:w-1/2">
-                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input 
-                  type="text" 
-                  placeholder="Search global news mysteries..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-black/60 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 transition-all"
-                />
-              </div>
-              <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
-                <button 
-                  onClick={() => setFilterCategory('All')}
-                  className={`px-5 py-2.5 rounded-xl text-[10px] font-black whitespace-nowrap border transition-all ${filterCategory === 'All' ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-white/5 border-white/10 hover:border-white/20'}`}
-                >
-                  ALL INTEL
-                </button>
-                {CATEGORIES.map(cat => (
-                  <button 
-                    key={cat}
-                    onClick={() => setFilterCategory(cat)}
-                    className={`px-5 py-2.5 rounded-xl text-[10px] font-black whitespace-nowrap border transition-all ${filterCategory === cat ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-white/5 border-white/10 hover:border-white/20'}`}
-                  >
-                    {cat.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            {/* News Feed Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              <AnimatePresence mode="popLayout">
-                {filtered.map(mystery => (
-                  <motion.div 
-                    layout
-                    key={mystery.id}
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="group bg-white/[0.03] border border-white/10 rounded-3xl overflow-hidden hover:border-white/20 hover:shadow-2xl hover:shadow-cyan-500/5 transition-all flex flex-col h-full"
-                  >
-                    <div className="p-7 flex-1">
-                      <div className="flex justify-between items-start mb-5">
-                        <StatusBadge status={mystery.status} />
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${mystery.urgency === 'Critical' ? 'bg-rose-500 animate-ping' : 'bg-slate-700'}`} />
-                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{mystery.category}</span>
-                        </div>
-                      </div>
-                      
-                      <h3 className="text-xl font-extrabold text-white mb-3 leading-[1.3] group-hover:text-cyan-400 transition-colors">
-                        {mystery.title}
-                      </h3>
-                      <p className="text-[13px] text-slate-400 line-clamp-4 mb-6 leading-relaxed">
-                        {mystery.description}
-                      </p>
-
-                      <div className="flex items-center gap-5 text-[10px] text-slate-500 font-mono font-bold">
-                        <div className="flex items-center gap-1.5 uppercase">
-                          <MapPin className="w-3 h-3 text-cyan-500" /> {mystery.location || 'GLOBAL'}
-                        </div>
-                        <div className="flex items-center gap-1.5 uppercase">
-                          <Users className="w-3 h-3 text-cyan-500" /> {mystery.authorName}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="px-7 py-5 border-t border-white/5 bg-white/[0.01] flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <button className="text-slate-500 hover:text-cyan-400 transition-colors flex items-center gap-1.5 text-[10px] font-bold"><MessageSquare className="w-4 h-4" /> 0</button>
-                        <button className="text-slate-500 hover:text-white transition-colors"><Award className="w-4 h-4" /></button>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button 
-                          onClick={() => setView('admin')}
-                          className="p-2.5 text-slate-600 hover:text-cyan-400 transition-colors"
-                          title="Review Intel"
-                        >
-                          <LayoutDashboard className="w-4.5 h-4.5" />
-                        </button>
-                        <button 
-                          onClick={() => deleteMystery(mystery.id)}
-                          className="p-2.5 text-slate-600 hover:text-rose-500 transition-colors"
-                          title="Purge Record"
-                        >
-                          <Trash2 className="w-4.5 h-4.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          </div>
-        )}
-
-        {view === 'submit' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-3xl mx-auto"
-          >
-            <div className="mb-10">
-              <h2 className="text-4xl font-black text-white mb-2">Submit News Intel</h2>
-              <p className="text-slate-500 text-sm font-medium">Contribute validated mystery sightings or social media news reports.</p>
-            </div>
-            
-            <form onSubmit={handleAddMystery} className="bg-white/[0.03] border border-white/10 rounded-[2rem] p-10 space-y-8 backdrop-blur-xl shadow-2xl">
-              <div className="space-y-3">
-                <label className="text-[11px] font-black text-white uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
-                   <Newspaper className="w-3.5 h-3.5 text-cyan-500" /> NEWS HEADING
-                </label>
-                <input 
-                  required type="text" value={formData.title} 
-                  onChange={e => setFormData({...formData, title: e.target.value})}
-                  placeholder="e.g., The Blue Sky Beam Discovery over Northern Districts"
-                  className="w-full bg-black/60 border border-white/10 rounded-2xl px-6 py-5 text-lg font-bold text-white placeholder:text-slate-700 focus:border-cyan-500/50 focus:ring-4 focus:ring-cyan-500/5 outline-none transition-all"
-                />
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-[11px] font-black text-white uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
-                  <Database className="w-3.5 h-3.5 text-cyan-500" /> NEWS DETAILS
-                </label>
-                <textarea 
-                  required rows="6" value={formData.description} 
-                  onChange={e => setFormData({...formData, description: e.target.value})}
-                  placeholder="Describe the mystery event in full detail. Include dates, witness descriptions, and observed patterns..."
-                  className="w-full bg-black/60 border border-white/10 rounded-2xl px-6 py-5 text-sm leading-relaxed text-slate-300 placeholder:text-slate-700 focus:border-cyan-500/50 outline-none resize-none transition-all"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Intelligence Category</label>
-                  <select 
-                    value={formData.category} 
-                    onChange={e => setFormData({...formData, category: e.target.value})}
-                    className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-4 text-xs font-bold text-white focus:border-cyan-500 outline-none"
-                  >
-                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Urgency Level</label>
-                  <select 
-                    value={formData.urgency} 
-                    onChange={e => setFormData({...formData, urgency: e.target.value})}
-                    className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-4 text-xs font-bold text-white focus:border-cyan-500 outline-none"
-                  >
-                    {URGENCY_LEVELS.map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Event Location</label>
-                  <input 
-                    type="text" value={formData.location} 
-                    onChange={e => setFormData({...formData, location: e.target.value})}
-                    placeholder="Region or Coordinates"
-                    className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-4 text-xs font-bold text-white outline-none"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Source Links / Tags</label>
-                  <input 
-                    type="text" value={formData.tags} 
-                    onChange={e => setFormData({...formData, tags: e.target.value})}
-                    placeholder="viral, eyewitness, video, leaked"
-                    className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-4 text-xs font-bold text-white outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-5 pt-6">
-                <button 
-                  type="button" onClick={() => setView('feed')}
-                  className="flex-1 bg-white/5 hover:bg-white/10 text-white font-black text-xs py-5 rounded-2xl transition-all"
-                >
-                  DISCARD
-                </button>
-                <button 
-                  type="submit"
-                  className="flex-[2] bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs py-5 rounded-2xl shadow-2xl shadow-cyan-900/20 transition-all active:scale-95"
-                >
-                  BROADCAST INTEL
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        )}
-
-        {view === 'admin' && (
-          <div className="space-y-10">
-            <div className="flex items-center justify-between">
-              <h2 className="text-3xl font-black text-white flex items-center gap-4">
-                <Shield className="text-cyan-500 w-8 h-8" /> Control Center
-              </h2>
-              <button 
-                onClick={() => setView('feed')}
-                className="text-xs font-black text-slate-500 hover:text-white flex items-center gap-2 transition-colors"
-              >
-                RETURN TO FEED <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="bg-white/[0.02] border border-white/10 rounded-[2rem] overflow-hidden backdrop-blur-2xl shadow-2xl">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-white/[0.03] border-b border-white/10">
-                    <th className="px-8 py-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">News Intel Heading</th>
-                    <th className="px-8 py-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">Classification</th>
-                    <th className="px-8 py-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">Investigation Status</th>
-                    <th className="px-8 py-6 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Operations</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {mysteries.map(m => (
-                    <tr key={m.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-8 py-6">
-                        <div className="text-sm font-black text-white mb-1">{m.title}</div>
-                        <div className="text-[10px] text-slate-600 font-mono font-bold uppercase tracking-tighter">REF-ID: {m.id.slice(0,10)}</div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{m.category}</span>
-                      </td>
-                      <td className="px-8 py-6">
-                        <select 
-                          value={m.status} 
-                          onChange={(e) => updateStatus(m.id, e.target.value)}
-                          className="bg-black border border-white/10 rounded-xl px-3 py-1.5 text-[10px] font-black text-cyan-400 focus:outline-none uppercase tracking-widest"
-                        >
-                          {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-8 py-6 text-right">
-                        <button 
-                          onClick={() => deleteMystery(m.id)}
-                          className="p-3 text-slate-600 hover:text-rose-500 transition-colors"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {mysteries.length === 0 && (
-                <div className="p-20 text-center text-slate-600 font-bold uppercase tracking-widest">No Intelligence Records Stored</div>
-              )}
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* Futuristic Footer */}
-      <footer className="border-t border-white/5 bg-black/80 py-20 mt-20 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-16">
-          <div className="col-span-2">
-            <div className="flex items-center gap-3 mb-6">
-              <Shield className="w-7 h-7 text-cyan-500" />
-              <span className="text-2xl font-black text-white tracking-tighter uppercase">News<span className="text-cyan-500">INTEL</span></span>
-            </div>
-            <p className="text-[13px] text-slate-500 max-w-sm leading-relaxed mb-8 font-medium">
-              A specialized news intelligence network for tracking viral social media mysteries and unexplained global events. 
-              Powered by decentralized field reporting.
-            </p>
-            <div className="flex items-center gap-6">
-              {['Signal', 'Discord', 'GitHub', 'Encrypted Wire'].map(p => (
-                <button key={p} className="text-slate-600 hover:text-cyan-400 transition-colors text-[10px] font-black uppercase tracking-widest">{p}</button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <h4 className="text-white text-[10px] font-black uppercase tracking-[0.3em] mb-8">Navigation</h4>
-            <ul className="space-y-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-              <li className="hover:text-cyan-400 cursor-pointer transition-colors">Field Reports</li>
-              <li className="hover:text-cyan-400 cursor-pointer transition-colors">Evidence Vault</li>
-              <li className="hover:text-cyan-400 cursor-pointer transition-colors">Agent Protocols</li>
-              <li className="hover:text-cyan-400 cursor-pointer transition-colors">Network Status</li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="text-white text-[10px] font-black uppercase tracking-[0.3em] mb-8">System Metrics</h4>
-            <div className="space-y-4">
-              <div className="bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-3 flex justify-between items-center">
-                <span className="text-[9px] font-black text-slate-600 uppercase">Uplink</span>
-                <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Secure</span>
-              </div>
-              <div className="bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-3 flex justify-between items-center">
-                <span className="text-[9px] font-black text-slate-600 uppercase">Latency</span>
-                <span className="text-[9px] font-black text-cyan-500 uppercase tracking-widest">14ms</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 mt-20 pt-10 border-t border-white/5 text-center">
-          <p className="text-[9px] font-mono font-bold text-slate-800 tracking-widest uppercase italic">© 2026 NEWS INTEL NETWORK // END-TO-END ENCRYPTED CHANNEL // NO LOGS KEPT</p>
-        </div>
-      </footer>
     </div>
-  );
-}
+
+  </header>
+
+  <!-- MAIN -->
+
+  <main class="max-w-7xl mx-auto px-6 py-10 relative z-10">
+
+    <div class="grid lg:grid-cols-3 gap-8">
+
+      <!-- FORM -->
+
+      <div class="lg:col-span-1">
+
+        <div class="glass rounded-3xl p-8 sticky top-28">
+
+          <h2 class="text-2xl font-black mb-6">
+            Submit Mystery
+          </h2>
+
+          <form id="mysteryForm" class="space-y-5">
+
+            <input
+              id="title"
+              type="text"
+              placeholder="Mystery Title"
+              class="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 outline-none"
+            />
+
+            <textarea
+              id="description"
+              placeholder="Mystery Description"
+              rows="6"
+              class="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 outline-none resize-none"
+            ></textarea>
+
+            <select
+              id="category"
+              class="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 outline-none"
+            >
+              <option>Breaking News</option>
+              <option>Crime</option>
+              <option>Paranormal</option>
+              <option>Social Viral</option>
+              <option>Tech</option>
+              <option>UFO/Military</option>
+            </select>
+
+            <button
+              type="submit"
+              class="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-black py-4 rounded-2xl transition-all"
+            >
+              Broadcast Intel
+            </button>
+
+          </form>
+
+        </div>
+
+      </div>
+
+      <!-- CONTENT -->
+
+      <div class="lg:col-span-2 space-y-8">
+
+        <!-- SEARCH -->
+
+        <div class="glass rounded-3xl p-5">
+
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="Search mystery news..."
+            class="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 outline-none"
+          />
+
+        </div>
+
+        <!-- STATS -->
+
+        <div class="grid md:grid-cols-3 gap-5">
+
+          <div class="glass rounded-3xl p-6">
+
+            <p class="text-slate-500 text-xs uppercase tracking-widest font-bold mb-2">
+              Total Records
+            </p>
+
+            <h2
+              id="totalCount"
+              class="text-4xl font-black"
+            >
+              0
+            </h2>
+
+          </div>
+
+          <div class="glass rounded-3xl p-6">
+
+            <p class="text-slate-500 text-xs uppercase tracking-widest font-bold mb-2">
+              Solved
+            </p>
+
+            <h2
+              id="solvedCount"
+              class="text-4xl font-black text-emerald-400"
+            >
+              0
+            </h2>
+
+          </div>
+
+          <div class="glass rounded-3xl p-6">
+
+            <p class="text-slate-500 text-xs uppercase tracking-widest font-bold mb-2">
+              Unsolved
+            </p>
+
+            <h2
+              id="unsolvedCount"
+              class="text-4xl font-black text-rose-400"
+            >
+              0
+            </h2>
+
+          </div>
+
+        </div>
+
+        <!-- LIST -->
+
+        <div
+          id="mysteryList"
+          class="grid md:grid-cols-2 gap-6"
+        ></div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- FIREBASE -->
+
+  <script type="module">
+
+    import { initializeApp }
+
+    from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+
+    import {
+
+      getFirestore,
+
+      collection,
+
+      addDoc,
+
+      deleteDoc,
+
+      updateDoc,
+
+      doc,
+
+      onSnapshot
+
+    }
+
+    from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+
+      apiKey: "AIzaSyBmsAClSWTfopqVJd8myG7vqQDSd9Z2XkA",
+
+      authDomain: "mystery-fff8d.firebaseapp.com",
+
+      projectId: "mystery-fff8d",
+
+      storageBucket: "mystery-fff8d.firebasestorage.app",
+
+      messagingSenderId: "1082125532602",
+
+      appId: "1:1082125532602:web:33b205e3047200d95d3183"
+    };
+
+    const app =
+      initializeApp(firebaseConfig);
+
+    const db =
+      getFirestore(app);
+
+    const mysteryCollection =
+      collection(db, "mysteries");
+
+    let mysteries = [];
+
+    // REALTIME
+
+    onSnapshot(mysteryCollection, (snapshot) => {
+
+      mysteries =
+        snapshot.docs.map((docItem) => ({
+          id: docItem.id,
+          ...docItem.data()
+        }));
+
+      mysteries.sort(
+        (a, b) =>
+          b.createdAt - a.createdAt
+      );
+
+      renderMysteries();
+    });
+
+    // ADD
+
+    document
+      .getElementById("mysteryForm")
+      .addEventListener("submit", async (e) => {
+
+        e.preventDefault();
+
+        const title =
+          document
+            .getElementById("title")
+            .value
+            .trim();
+
+        const description =
+          document
+            .getElementById("description")
+            .value
+            .trim();
+
+        const category =
+          document
+            .getElementById("category")
+            .value;
+
+        if (!title || !description) {
+
+          alert("Fill all fields");
+
+          return;
+        }
+
+        await addDoc(
+          mysteryCollection,
+          {
+            title,
+            description,
+            category,
+            status: "Unsolved",
+            createdAt: Date.now()
+          }
+        );
+
+        document.getElementById("title").value = "";
+
+        document.getElementById("description").value = "";
+      });
+
+    // SEARCH
+
+    document
+      .getElementById("searchInput")
+      .addEventListener("keyup", renderMysteries);
+
+    // RENDER
+
+    function renderMysteries() {
+
+      const container =
+        document.getElementById("mysteryList");
+
+      const search =
+        document
+          .getElementById("searchInput")
+          .value
+          .toLowerCase();
+
+      container.innerHTML = "";
+
+      let solved = 0;
+
+      mysteries.forEach((mystery) => {
+
+        const titleMatch =
+          mystery.title
+            .toLowerCase()
+            .includes(search);
+
+        const descMatch =
+          mystery.description
+            .toLowerCase()
+            .includes(search);
+
+        if (!titleMatch && !descMatch) {
+          return;
+        }
+
+        if (mystery.status === "Solved") {
+          solved++;
+        }
+
+        const statusColor =
+
+          mystery.status === "Solved"
+
+            ? "bg-emerald-500/20 text-emerald-400"
+
+            : "bg-rose-500/20 text-rose-400";
+
+        const card =
+          document.createElement("div");
+
+        card.className =
+          "glass rounded-3xl p-6";
+
+        card.innerHTML = `
+
+          <div class="flex justify-between items-start gap-4 mb-5">
+
+            <div>
+
+              <h2 class="text-2xl font-black text-white mb-2">
+                ${mystery.title}
+              </h2>
+
+              <div class="flex gap-2 flex-wrap">
+
+                <span class="px-3 py-1 rounded-full text-xs ${statusColor}">
+                  ${mystery.status}
+                </span>
+
+                <span class="px-3 py-1 rounded-full text-xs bg-cyan-500/20 text-cyan-400">
+                  ${mystery.category}
+                </span>
+
+              </div>
+
+            </div>
+
+          </div>
+
+          <p class="text-slate-300 leading-7 whitespace-pre-wrap mb-6">
+            ${mystery.description}
+          </p>
+
+          <div class="flex flex-wrap gap-3">
+
+            <button
+              class="solveBtn bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl text-sm font-bold"
+              data-id="${mystery.id}"
+            >
+              Toggle Status
+            </button>
+
+            <button
+              class="editBtn bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-2 rounded-xl text-sm font-bold"
+              data-id="${mystery.id}"
+            >
+              Edit
+            </button>
+
+            <button
+              class="deleteBtn bg-rose-600 hover:bg-rose-500 px-4 py-2 rounded-xl text-sm font-bold"
+              data-id="${mystery.id}"
+            >
+              Delete
+            </button>
+
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+
+      // STATS
+
+      document.getElementById("totalCount").innerText =
+        mysteries.length;
+
+      document.getElementById("solvedCount").innerText =
+        solved;
+
+      document.getElementById("unsolvedCount").innerText =
+        mysteries.length - solved;
+
+      bindButtons();
+    }
+
+    // BUTTONS
+
+    function bindButtons() {
+
+      // DELETE
+
+      document
+        .querySelectorAll(".deleteBtn")
+        .forEach((btn) => {
+
+          btn.addEventListener("click", async () => {
+
+            const id =
+              btn.dataset.id;
+
+            await deleteDoc(
+              doc(db, "mysteries", id)
+            );
+          });
+        });
+
+      // SOLVE
+
+      document
+        .querySelectorAll(".solveBtn")
+        .forEach((btn) => {
+
+          btn.addEventListener("click", async () => {
+
+            const id =
+              btn.dataset.id;
+
+            const mystery =
+              mysteries.find(m => m.id === id);
+
+            const nextStatus =
+
+              mystery.status === "Solved"
+
+                ? "Unsolved"
+
+                : "Solved";
+
+            await updateDoc(
+              doc(db, "mysteries", id),
+              {
+                status: nextStatus
+              }
+            );
+          });
+        });
+
+      // EDIT
+
+      document
+        .querySelectorAll(".editBtn")
+        .forEach((btn) => {
+
+          btn.addEventListener("click", async () => {
+
+            const id =
+              btn.dataset.id;
+
+            const mystery =
+              mysteries.find(m => m.id === id);
+
+            const newTitle =
+              prompt(
+                "Edit Title",
+                mystery.title
+              );
+
+            if (newTitle === null) {
+              return;
+            }
+
+            const newDesc =
+              prompt(
+                "Edit Description",
+                mystery.description
+              );
+
+            if (newDesc === null) {
+              return;
+            }
+
+            await updateDoc(
+              doc(db, "mysteries", id),
+              {
+                title: newTitle,
+                description: newDesc
+              }
+            );
+          });
+        });
+    }
+
+  </script>
+
+</body>
+</html>
